@@ -3,8 +3,11 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import os
 
-# MongoDB connection URI
-uri = "mongodb+srv://gscrac12:Ff8gjnVXuRHYggV@fragrancedb.yguufac.mongodb.net/?retryWrites=true&w=majority"
+# MongoDB connection URI from environment variable
+uri = os.getenv("MONGO_URI")
+
+# Debug: Print the URI to verify it's being read correctly
+print(f"MongoDB URI: {uri}")
 
 # Create a new client and connect to the server
 client = MongoClient(uri, server_api=ServerApi('1'), tls=True, tlsCAFile=certifi.where())

@@ -1,4 +1,8 @@
 # main_scraper_perfumedigital.py
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 from classes.classes import FragranceItem
 from aux_functions.async_functions import *
 import re
@@ -7,11 +11,14 @@ import chardet
 import time
 from aux_functions.db_functions import insert_or_update_fragrances
 from bs4 import BeautifulSoup
-from datetime import datetime
 from my_flask_app.mongo import db
+from aux_functions.data_functions import *
+
+
+
 
 BASE_URL = "https://perfumedigital.es/"
-semaphore_value = 10
+semaphore_value = 15
 retries_value = 3
 delays_value = 1
 
@@ -50,7 +57,7 @@ def parse(html, url):
                 quantity = 0
 
             fragrance = FragranceItem(
-                brand=brand,
+                brand=standardize_strings(standardize_brand_name(brand)),
                 fragrance_name=fragrance_name,
                 quantity=quantity,
                 price_amount=float(price_amount) if price_amount else None,

@@ -3,9 +3,29 @@ from pymongo import UpdateOne, DeleteOne
 from bson import ObjectId
 from classes.classes import FragranceItem
 from datetime import datetime
+from pymongo import MongoClient
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 # Enable detailed logging
 #logging.basicConfig(level=logging.DEBUG)
+
+#ligar à db
+def get_database():
+    uri = os.getenv("MONGO_URI")
+    client = MongoClient(uri)
+    db = client.get_database()  # Adjust this line to connect to your specific database
+    return db
+
+# Apagar uma tabela duma db da Mongo (collection)
+def delete_collection(collection_name):
+    db = get_database()
+    if collection_name in db.list_collection_names():
+        db.drop_collection(collection_name)
+        print(f"Collection '{collection_name}' has been deleted.")
+    else:
+        print(f"Collection '{collection_name}' does not exist.")
 
 
 def fragrance_item_to_dict(fragrance):

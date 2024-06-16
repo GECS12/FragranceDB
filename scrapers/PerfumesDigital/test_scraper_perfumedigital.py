@@ -1,4 +1,11 @@
 # main_scraper_perfumedigital.py
+from dotenv import load_dotenv
+import os
+
+import aux_functions.db_functions
+
+load_dotenv()
+
 from classes.classes import FragranceItem
 from aux_functions.async_functions import *
 import re
@@ -7,13 +14,30 @@ import chardet
 import time
 from aux_functions.db_functions import insert_or_update_fragrances
 from bs4 import BeautifulSoup
-from datetime import datetime
 from my_flask_app.mongo import db
+from aux_functions.data_functions import *
+
+
+
 
 BASE_URL = "https://perfumedigital.es/"
 semaphore_value = 10
 retries_value = 3
 delays_value = 1
+
+def extract_brands_from_html(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    brands = []
+
+    select_tag = soup.find('select', {'name': 'marca'})
+    if select_tag:
+        options = select_tag.find_all('option')
+        for option in options:
+            brand = option.get('value')
+            if brand and brand.strip() != "":
+                brands.append(brand.strip())
+
+    return brands
 
 def parse(html, url):
     soup = BeautifulSoup(html, 'html.parser')
@@ -50,7 +74,7 @@ def parse(html, url):
                 quantity = 0
 
             fragrance = FragranceItem(
-                brand=brand,
+                brand=standardize_strings(standardize_brand_name(brand)),
                 fragrance_name=fragrance_name,
                 quantity=quantity,
                 price_amount=float(price_amount) if price_amount else None,
@@ -114,7 +138,7 @@ async def main():
             else:
                 print("Total pages info not found, defaulting to 1.")
                 quit()
-    selected_pages = total_pages
+    selected_pages = 5
     urls = [
         f"https://perfumedigital.es/index.php?PASE={i * 15}&marca=&buscado=&ID_CATEGORIA=&ORDEN=&precio1=&precio2=#PRODUCTOS"
         for i in range(selected_pages)
@@ -140,12 +164,15 @@ async def main():
     all_fragrances = await asyncio.gather(*[fetch_gender_perfumedigital(fragrance, semaphore) for fragrance in all_fragrances])
 
     # Define the collection
-    collection = db["PerfumeDigital"]
+    aux_functions.db_functions.delete_collection(db["PerfumeDigitalTest"])
+    aux_functions.db_functions.delete_collection(db["PerfumeDigitalTest2"])
+    aux_functions.db_functions.delete_collection(db["PerfumeDigitalTest3"])
+    #collection = db["PerfumeDigitalTest1"]
 
-    insert_or_update_fragrances(collection, all_fragrances)
+    #insert_or_update_fragrances(collection, all_fragrances)
 
-    print("Insert/Update/Remove Fragrances to DB Mongo Complete.")
-
+    #print("Insert/Update/Remove Fragrances to DB Mongo Complete.")
+    #save_to_excel(all_fragrances)
     if failed_pages:
         print(f"Failed to scrape the following pages: {failed_pages}")
 

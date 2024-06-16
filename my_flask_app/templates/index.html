@@ -13,6 +13,28 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <!-- Include Custom CSS -->
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        table.dataTable th,
+        table.dataTable td {
+            text-align: center;
+        }
+        table.dataTable thead th {
+            text-align: center !important;
+        }
+    </style>
 </head>
 <body>
     <div class="container">

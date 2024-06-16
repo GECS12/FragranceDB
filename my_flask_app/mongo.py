@@ -1,7 +1,7 @@
-# mongo.py
 import certifi
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+import os
 
 # MongoDB connection URI
 uri = "mongodb+srv://gscrac12:Ff8gjnVXuRHYggV@fragrancedb.yguufac.mongodb.net/?retryWrites=true&w=majority"

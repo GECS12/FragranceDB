@@ -3,7 +3,7 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import os
 from dotenv import load_dotenv
-from aux_functions.db_functions import *
+#from aux_functions.db_functions import *
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,5 +26,4 @@ def test_connection():
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    delete_collection("")
     test_connection()

@@ -1,12 +1,13 @@
-# test_insert_initial_data.py
 from datetime import datetime
 from classes.classes import FragranceItem
-from aux_functions.db_functions import insert_or_update_fragrances
+from aux_functions.db_functions import *
 from my_flask_app.mongo import db
 
-# Define the collection
-collection = db["PerfumeDigitalTest"]
 
+# Define the collection
+collection = db["ManualInsertTest"]
+
+# Create test data
 # Create test data
 test_fragrances = [
     FragranceItem(
@@ -19,7 +20,7 @@ test_fragrances = [
         website="TestSite",
         country=["PT"],
         last_updated_at=datetime.now(),
-        is_set_or_pack="N",
+        is_set_or_pack=True,
         gender="Women",
         price_alert_threshold=18.00
     ),
@@ -33,7 +34,7 @@ test_fragrances = [
         website="TestSite",
         country=["PT"],
         last_updated_at=datetime.now(),
-        is_set_or_pack="N",
+        is_set_or_pack=True,
         gender="Men",
         price_alert_threshold=12.00
     ),
@@ -47,12 +48,13 @@ test_fragrances = [
         website="TestSite",
         country=["PT"],
         last_updated_at=datetime.now(),
-        is_set_or_pack="N",
+        is_set_or_pack=False,
         gender="Unisex",
         price_alert_threshold=20.00
     )
 ]
 
 # Insert test data into MongoDB
+delete_collection("ManualInsertTest")
 insert_or_update_fragrances(collection, test_fragrances)
-print("Initial test data inserted.")
+#("Initial test data inserted.")

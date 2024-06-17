@@ -1,10 +1,8 @@
-# classes.py
-
 from datetime import datetime
 from typing import List, Optional
 
 class FragranceItem:
-    def __init__(self, brand: str, fragrance_name: str, quantity: int, price_amount: float, price_currency: str, link: str, website: str, country: List[str], last_updated_at: datetime, is_set_or_pack: str, gender: Optional[str] = None, price_history: Optional[List[dict]] = None, price_changed: Optional[bool] = False, price_alert_threshold: Optional[float] = None):
+    def __init__(self, brand: str, fragrance_name: str, quantity: int, price_amount: float, price_currency: str, link: str, website: str, country: List[str], last_updated_at: datetime, is_set_or_pack: bool, gender: Optional[str] = None, price_history: Optional[List[dict]] = None, price_changed: Optional[bool] = False, price_alert_threshold: Optional[float] = None):
         self.brand = brand
         self.fragrance_name = fragrance_name
         self.quantity = quantity

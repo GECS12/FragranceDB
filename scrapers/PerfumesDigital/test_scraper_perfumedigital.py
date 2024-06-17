@@ -1,9 +1,6 @@
 # main_scraper_perfumedigital.py
 from dotenv import load_dotenv
 import os
-
-import aux_functions.db_functions
-
 load_dotenv()
 
 from classes.classes import FragranceItem
@@ -21,23 +18,20 @@ from aux_functions.data_functions import *
 
 
 BASE_URL = "https://perfumedigital.es/"
-semaphore_value = 10
+semaphore_value = 15
 retries_value = 3
 delays_value = 1
 
-def extract_brands_from_html(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    brands = []
+def extract_quantity(fragrance_name):
+    match = re.search(r'\b(\d+)\s*ML\b', fragrance_name, re.IGNORECASE)
+    return int(match.group(1)) if match else None
 
-    select_tag = soup.find('select', {'name': 'marca'})
-    if select_tag:
-        options = select_tag.find_all('option')
-        for option in options:
-            brand = option.get('value')
-            if brand and brand.strip() != "":
-                brands.append(brand.strip())
-
-    return brands
+def clean_fragrance_name(fragrance_name, is_set_or_pack):
+    if not is_set_or_pack:
+        fragrance_name = fragrance_name.replace('@', '- Tester')
+        fragrance_name = fragrance_name.lower()
+        fragrance_name = re.sub(r'\b\d+\s*ml\b', '', fragrance_name, flags=re.IGNORECASE).strip()
+    return fragrance_name
 
 def parse(html, url):
     soup = BeautifulSoup(html, 'html.parser')
@@ -69,8 +63,8 @@ def parse(html, url):
 
             link = BASE_URL + link_tag['href'] if link_tag else None
 
-            is_set_or_pack = 'Y' if any(keyword in fragrance_name.lower() for keyword in ['lote', 'pack', 'packs']) else 'N'
-            if is_set_or_pack == 'Y':
+            is_set_or_pack = any(keyword in fragrance_name.lower() for keyword in ['lote', 'pack', 'packs', 'set'])
+            if is_set_or_pack:
                 quantity = 0
 
             fragrance = FragranceItem(
@@ -90,10 +84,6 @@ def parse(html, url):
             fragrances.append(fragrance)
 
     return fragrances
-
-def extract_quantity(fragrance_name):
-    match = re.search(r'\b(\d+)\s*ML\b', fragrance_name, re.IGNORECASE)
-    return int(match.group(1)) if match else None
 
 async def fetch_gender_perfumedigital(fragrance, semaphore, retries=retries_value, delay=delays_value):
     async with semaphore:
@@ -164,15 +154,12 @@ async def main():
     all_fragrances = await asyncio.gather(*[fetch_gender_perfumedigital(fragrance, semaphore) for fragrance in all_fragrances])
 
     # Define the collection
-    aux_functions.db_functions.delete_collection(db["PerfumeDigitalTest"])
-    aux_functions.db_functions.delete_collection(db["PerfumeDigitalTest2"])
-    aux_functions.db_functions.delete_collection(db["PerfumeDigitalTest3"])
-    #collection = db["PerfumeDigitalTest1"]
+    collection = db["PerfumeDigital"]
 
-    #insert_or_update_fragrances(collection, all_fragrances)
+    insert_or_update_fragrances(collection, all_fragrances)
 
-    #print("Insert/Update/Remove Fragrances to DB Mongo Complete.")
-    #save_to_excel(all_fragrances)
+    print("Insert/Update/Remove Fragrances to DB Mongo Complete.")
+
     if failed_pages:
         print(f"Failed to scrape the following pages: {failed_pages}")
 

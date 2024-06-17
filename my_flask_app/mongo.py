@@ -1,20 +1,15 @@
 import certifi
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+from aux_functions.db_functions import *
 
 # Load environment variables from .env file
 load_dotenv()
 
 # MongoDB connection URI from environment variable
 uri = os.getenv("MONGO_URI")
-
-# Debug: Print the URI to verify it's being read correctly
-if not uri:
-    raise EnvironmentError("MONGO_URI environment variable is not set")
-
-print(f"MongoDB URI: {uri}")
 
 # Create a new client and connect to the server
 client = MongoClient(uri, server_api=ServerApi('1'), tls=True, tlsCAFile=certifi.where())
@@ -31,4 +26,5 @@ def test_connection():
         print(f"Error: {e}")
 
 if __name__ == "__main__":
+    delete_collection("")
     test_connection()

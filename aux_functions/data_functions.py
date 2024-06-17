@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 import pandas as pd
-
+import re
 
 def save_to_excel(fragrances, base_path, scraper_name):
     timestamp = datetime.now().strftime("%d_%b_%Y %H" + "h" "%M" + "m")
@@ -92,7 +92,21 @@ def standardize_brand_name(brand_name):
     return BRAND_NAME_MAPPING.get(lower_case_brand_name, brand_name)
 
 def standardize_strings(string):
+    string = string.replace('`', "'")
     return string.title()
+
+def fragrance_type_cleaner(string):
+    # Replace full phrases with abbreviations
+    string = re.sub(r'\beau de toilette\b', 'EDT', string, flags=re.IGNORECASE)
+    string = re.sub(r'\beau de parfum\b', 'EDP', string, flags=re.IGNORECASE)
+    string = re.sub(r'\beau de cologne\b', 'EDC', string, flags=re.IGNORECASE)
+
+    # Ensure existing abbreviations are uppercase
+    string = re.sub(r'\bedt\b', 'EDT', string, flags=re.IGNORECASE)
+    string = re.sub(r'\bedp\b', 'EDP', string, flags=re.IGNORECASE)
+    string = re.sub(r'\bedc\b', 'EDC', string, flags=re.IGNORECASE)
+
+    return string
 
 
 

@@ -2,20 +2,27 @@ import os
 from datetime import datetime
 import pandas as pd
 import re
+from classes.classes import *
 
+
+# Save fragrance data to an Excel file
 def save_to_excel(fragrances, base_path, scraper_name):
+    # Create timestamp for the filename
     timestamp = datetime.now().strftime("%d_%b_%Y %H" + "h" "%M" + "m")
     filename = f'{scraper_name} on {timestamp}.xlsx'
     full_path = os.path.join(base_path, filename)
-    os.makedirs(base_path, exist_ok=True)  # Verificar se existe path
+    os.makedirs(base_path, exist_ok=True)  # Ensure the directory exists
 
-    fragrances_data = [fragrance.__dict__ for fragrance in fragrances]
+    # Convert fragrance data to dictionary and save as Excel file
+    fragrances_data = [fragrance.to_dict() for fragrance in fragrances]
     df = pd.DataFrame(fragrances_data)
     df.to_excel(full_path, index=False)
-
     print(filename + " has been saved in " + full_path)
 
+
+# Mapping of brand names to their standardized forms
 BRAND_NAME_MAPPING = {
+    'afnan perfumes': 'Afnan',
     'abercrombie': 'Abercrombie & Fitch',
     'angel schlesser': 'Angel Schlesser',
     'annick goutal': 'Goutal Paris',
@@ -35,7 +42,8 @@ BRAND_NAME_MAPPING = {
     'dior': 'Christian Dior',
     'dolce gabbana': 'Dolce & Gabbana',
     'donna karan': 'Dkny',
-    'dsquared': 'Dsquared2',
+    'dsquared': 'Dsquared²',
+    'dsquared2': 'Dsquared²',
     'duck': 'Mandarina Duck',
     'emporio armani': 'Giorgio Armani',
     'estee lauder': 'Estée Lauder',
@@ -45,6 +53,7 @@ BRAND_NAME_MAPPING = {
     'giorgio beverly': 'Giorgio Beverly Hills',
     'gualtier': 'Jean Paul Gaultier',
     'guerlain': 'Guerlain',
+    'gres': 'Grès',
     'hermes': 'Hermès',
     'hilfiger': 'Tommy Hilfiger',
     'hugo': 'Hugo Boss',
@@ -81,33 +90,64 @@ BRAND_NAME_MAPPING = {
     'versace': 'Gianni Versace',
     'viktor and rolf': 'Viktor & Rolf',
     'yslaurent': 'Yves Saint Laurent',
+    'swiss army': 'Victorinox Swiss Army',
     'ysl': 'Yves Saint Laurent',
     'zegna': 'Ermenegildo Zegna'
 }
 
-def standardize_brand_name(brand_name):
+
+# Standardize brand names based on the mapping
+def standardize_brand_names(brand_name):
     # Convert the brand name to lower case
     lower_case_brand_name = brand_name.lower()
     # Use the dictionary to map the brand name to the standard name if it exists
-    return BRAND_NAME_MAPPING.get(lower_case_brand_name, brand_name)
+    return BRAND_NAME_MAPPING.get(lower_case_brand_name, brand_name.title())
 
-def standardize_strings(string):
+
+# Standardize fragrance names
+def standardize_fragrance_names(string, brand):
+    # Convert the entire string to lowercase
+    string = string.lower()
     string = string.replace('`', "'")
-    return string.title()
+    string = string.replace('´', "'")
+    string = string.replace('¬≤', '²')
 
-def fragrance_type_cleaner(string):
-    # Replace full phrases with abbreviations
-    string = re.sub(r'\beau de toilette\b', 'EDT', string, flags=re.IGNORECASE)
-    string = re.sub(r'\beau de parfum\b', 'EDP', string, flags=re.IGNORECASE)
-    string = re.sub(r'\beau de cologne\b', 'EDC', string, flags=re.IGNORECASE)
+    # Replace "eau de toilette", "eau de parfum", "eau de cologne" with "edt", "edp", "edc" respectively
+    string = re.sub(r'\beau de toilette\b', 'edt', string)
+    string = re.sub(r'\beau de parfum\b', 'edp', string)
+    string = re.sub(r'\beau de cologne\b', 'edc', string)
 
-    # Ensure existing abbreviations are uppercase
-    string = re.sub(r'\bedt\b', 'EDT', string, flags=re.IGNORECASE)
-    string = re.sub(r'\bedp\b', 'EDP', string, flags=re.IGNORECASE)
-    string = re.sub(r'\bedc\b', 'EDC', string, flags=re.IGNORECASE)
+    # Convert strings like "75 G" or "75 GR" or "75 GRAMS" to "75g"
+    string = re.sub(r'(\d+)\s*(g|gr|grams)', r'\1g', string, flags=re.IGNORECASE)
 
-    return string
+    # Convert comma to period in numbers like "75,5" to "75.5"
+    string = re.sub(r'(\d+),(\d+)', r'\1.\2', string)
 
+    # Replace the non-standardized brand name with the standardized one
+    standardized_brand = standardize_brand_names(brand)
+    string = re.sub(brand.lower(), standardized_brand.lower(), string, count=1)
 
+    # Split the string into words to process each word separately
+    words = string.split()
 
+    # Title case each word, but keep some in Upper CASE
+    title_cased_words = []
+    for word in words:
+        if word in {'edt', 'edp', 'edc'}:
+            title_cased_words.append(word.upper())
+        else:
+            title_cased_words.append(word.title())
+
+    # Join the words back into a single string
+    title_cased_string = ' '.join(title_cased_words)
+
+    # Ensure "ml" and "g" are maintained in lowercase
+    title_cased_string = re.sub(r'(\d+)\s*ml', r'\1ml', title_cased_string, flags=re.IGNORECASE)
+    title_cased_string = re.sub(r'(\d+)\s*g', r'\1g', title_cased_string, flags=re.IGNORECASE)
+
+    # Check if the standardized brand name is at the beginning, add it if not
+    if not title_cased_string.lower().startswith(standardized_brand.lower()):
+        title_cased_string = f"{standardized_brand} {title_cased_string}"
+
+    return title_cased_string
 

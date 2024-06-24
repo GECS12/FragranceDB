@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Profile</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h2>User Profile</h2>
+    <p>Username: {{ user['username'] }}</p>
+    <p>Email: {{ user['email'] }}</p>
+    <a href="/logout">Logout</a>
+
+    <h3>Favorite Fragrances</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Brand</th>
+                <th>Fragrance Name</th>
+                <th>Quantity (ML)</th>
+                <th>Price (€)</th>
+                <th>Website</th>
+                <th>Price Alert Threshold (€)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fragrance in user['favorites'] %}
+            <tr>
+                <td>{{ fragrance.brand }}</td>
+                <td>{{ fragrance.fragrance_name }}</td>
+                <td>{{ fragrance.quantity }}</td>
+                <td>{{ fragrance.price_amount }}</td>
+                <td>{{ fragrance.website }}</td>
+                <td>
+                    <form method="POST">
+                        <input type="hidden" name="fragrance_id" value="{{ fragrance._id }}">
+                        <input type="number" name="price_alert_threshold" value="{{ fragrance.price_alert_threshold or '' }}" step="0.01" required>
+                        <button type="submit">Set</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

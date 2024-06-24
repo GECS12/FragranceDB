@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>Search Results</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Brand</th>
+                <th>Fragrance Name</th>
+                <th>Quantity (ML)</th>
+                <th>Price (€)</th>
+                <th>Link</th>
+                <th>Website</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fragrance in fragrances %}
+            <tr>
+                <td>{{ fragrance.brand }}</td>
+                <td>{{ fragrance.fragrance_name }}</td>
+                <td>{{ fragrance.quantity_ml }}</td>
+                <td>{{ fragrance.price_amount }}</td>
+                <td><a href="{{ fragrance.link }}">Link</a></td>
+                <td>{{ fragrance.website }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

@@ -2,99 +2,253 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Perfumes Portugal</title>
-    <!-- Include DataTables CSS -->
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/jquery.dataTables.min.css') }}">
-    <!-- Include jQuery and DataTables JS -->
-    <script type="text/javascript" charset="utf8" src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
-    <script type="text/javascript" charset="utf8" src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
-    <!-- Include jQuery UI CSS and JS for autocomplete -->
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <!-- Include Custom CSS -->
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Fragrance Database</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/jquery.dataTables.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
+        .ui-autocomplete {
+            z-index: 1000;
+            background-color: white;
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 14px;
+            padding: 5px;
+            max-width: 600px;
+            box-sizing: border-box;
+        }
+        .ui-autocomplete .ui-menu-item {
+            padding: 5px;
+            cursor: pointer;
+        }
+        .ui-autocomplete .ui-menu-item:hover {
+            background-color: #f0f0f0;
+        }
+        .ui-helper-hidden-accessible {
+            display: none;
+        }
+        nav a {
+            margin-right: 20px;
         }
         .container {
-            width: 90%;
             max-width: 1200px;
             margin: 0 auto;
-            text-align: center;
         }
-        table.dataTable th,
-        table.dataTable td {
-            text-align: center;
+        header {
+            display: flex;
+            justify-content: flex-end;
+            padding: 10px 0;
         }
-        table.dataTable thead th {
-            text-align: center !important;
+        header nav a {
+            margin-left: 20px;
+            text-decoration: none;
+            color: #333;
+            font-weight: bold;
+        }
+        main {
+            padding: 20px;
+        }
+        main h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+        form {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        form input[type="text"], form select {
+            padding: 10px;
+            font-size: 1em;
+            width: 200px;
+        }
+        form button {
+            padding: 10px 20px;
+            font-size: 1em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        form button:hover {
+            background-color: #45a049;
+        }
+        table.dataTable {
+            width: 100% !important;
         }
     </style>
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Fragrance Search</h1>
-        <form method="POST">
-            <input type="text" name="query" placeholder="Search for fragrances...">
-            <button type="submit">Search</button>
-        </form>
-        <form method="POST">
-            <input type="text" id="brand" name="brand" placeholder="Search by brand...">
-            <button type="submit">Search by Brand</button>
-        </form>
-        <table id="fragranceTable" class="display">
-            <thead>
-                <tr>
-                    <th>Brand</th>
-                    <th>Fragrance Name</th>
-                    <th>Quantity (ML)</th>
-                    <th>Price (€)</th>
-                    <th>Link</th>
-                    <th>Website</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in results %}
-                <tr>
-                    <td>{{ row[0] }}</td>
-                    <td>{{ row[1] }}</td>
-                    <td>{{ row[2] }}</td>
-                    <td>{{ row[3] }}</td>
-                    <td><a href="{{ row[4] }}">{{ row[4] }}</a></td>
-                    <td>{{ row[5] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <header>
+            <nav>
+                {% if 'username' in session %}
+                    <a href="{{ url_for('profile') }}">Profile</a>
+                    <a href="{{ url_for('logout') }}">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('signin') }}">Sign In</a>
+                    <a href="{{ url_for('register') }}">Register</a>
+                {% endif %}
+            </nav>
+        </header>
+        <main>
+            <h1>Fragrance Database</h1>
+            <form>
+                <input type="text" id="brandSearch" placeholder="Search Brand">
+                <button type="button" id="searchBrandButton">Search Brand</button>
+                <input type="text" id="fragranceSearch" placeholder="Search Fragrance Name">
+                <button type="button" id="searchFragranceButton">Search Fragrance Name</button>
+                <select id="genderFilter">
+                    <option value="">Select Gender</option>
+                    <option value="Men">Men</option>
+                    <option value="Women">Women</option>
+                </select>
+            </form>
+            <table id="fragranceTable" class="display">
+                <thead>
+                    <tr>
+                        <th>Brand</th>
+                        <th>Fragrance Name</th>
+                        <th>Quantity (ML)</th>
+                        <th>Price (€)</th>
+                        <th>Link</th>
+                        <th>Website</th>
+                        <th>Gender</th>
+                        {% if 'username' in session %}
+                        <th>Favorite</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+            </table>
+        </main>
+    </div>
+<script>
+    $(document).ready(function() {
+        var table = $('#fragranceTable').DataTable({
+            "ajax": {
+                "url": "/data",
+                "dataSrc": "data"
+            },
+            "columns": [
+                { "data": "brand" },
+                { "data": "clean_fragrance_name" },
+                { "data": "quantity" },
+                { "data": "price_amount" },
+                { "data": "link", "render": function(data, type, row) {
+                    return '<a href="' + data + '">Link</a>';
+                }},
+                { "data": "website" },
+                { "data": "gender" },
+                {% if 'username' in session %}
+                { "data": null, "defaultContent": '<button class="favorite-button">Add to Favorites</button>' }
+                {% endif %}
+            ]
+        });
 
-        <script>
-        $(document).ready(function() {
-            $('#fragranceTable').DataTable({
-                "language": {
-                    "search": "Filter records:"
-                },
-                "lengthMenu": [20, 50, 100, 200, 500]
+        function refreshTable(data) {
+            table.clear().rows.add(data.data).draw();
+        }
+
+        $("#brandSearch").autocomplete({
+            source: function(request, response) {
+                $.ajax({
+                    url: "/autocomplete_brand",
+                    dataType: "json",
+                    data: {
+                        query: request.term
+                    },
+                    success: function(data) {
+                        response(data);
+                    }
+                });
+            },
+            minLength: 3,
+            select: function(event, ui) {
+                $("#brandSearch").val(ui.item.value);
+                return false;
+            }
+        });
+
+        $("#fragranceSearch").autocomplete({
+            source: function(request, response) {
+                $.ajax({
+                    url: "/autocomplete_fragrance",
+                    dataType: "json",
+                    data: {
+                        query: request.term
+                    },
+                    success: function(data) {
+                        response(data);
+                    }
+                });
+            },
+            minLength: 5,
+            select: function(event, ui) {
+                $("#fragranceSearch").val(ui.item.value);
+                return false;
+            }
+        });
+
+        $('#searchBrandButton').click(function() {
+            var query = $('#brandSearch').val();
+            $.ajax({
+                url: '/search_by_brand',
+                data: { query: query },
+                success: function(data) {
+                    refreshTable(data);
+                }
             });
+            $('#brandSearch').val('');  // Clear the search field
+        });
 
-            $("#brand").autocomplete({
-                source: function(request, response) {
-                    $.ajax({
-                        url: "/autocomplete",
-                        data: { query: request.term },
-                        success: function(data) {
-                            response(data);
-                        }
-                    });
+        $('#searchFragranceButton').click(function() {
+            var query = $('#fragranceSearch').val();
+            $.ajax({
+                url: '/search_by_fragrance',
+                data: { query: query },
+                success: function(data) {
+                    refreshTable(data);
+                }
+            });
+            $('#fragranceSearch').val('');  // Clear the search field
+        });
+
+        $('#genderFilter').change(function() {
+            var gender = $(this).val();
+            if (gender) {
+                table.column(6).search("^" + gender + "$", true, false, true).draw();
+            } else {
+                table.column(6).search('').draw();
+            }
+        });
+
+        {% if 'username' in session %}
+        $('#fragranceTable tbody').on('click', '.favorite-button', function() {
+            var data = table.row($(this).parents('tr')).data();
+            $.ajax({
+                url: "/add_to_favorites",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(data),
+                success: function(response) {
+                    if (response.success) {
+                        alert("Added to favorites!");
+                    } else {
+                        alert("Failed to add to favorites: " + response.error);
+                    }
                 },
-                minLength: 3
+                error: function(xhr, status, error) {
+                    alert("An error occurred: " + xhr.responseText);
+                }
             });
         });
-        </script>
-    </div>
+        {% endif %}
+    });
+</script>
 </body>
 </html>

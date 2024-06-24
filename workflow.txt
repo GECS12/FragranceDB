@@ -1,0 +1,15 @@
+specific clean website
+sub specific words, add missing info, etc
+
+clean name = clean specific website + standardize (should include change from digits with 75,5 to 75.5 as well)
+
+set_or_pack = True
+quantity = 0
+
+else
+quantity_match = re.search for digits (including with . like 75.5)
+quantity = float(quantity_match.group(1)) if quantity_match else None
+remove quantity from clean fragrance name
+
+
+

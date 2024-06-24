@@ -1,15 +1,18 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import hashlib
-from aux_functions.db_functions import *
 import os
 import sys
 import certifi
 from dotenv import load_dotenv
 import re
 
-
+# Ensure the base directory is in the sys.path
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_dir)
+
+from aux_functions.db_functions import *
+from classes.classes import FragranceItem
+
 
 load_dotenv()
 

@@ -1,15 +1,12 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-from pymongo import MongoClient
-import re
-from classes.classes import FragranceItem
 from aux_functions.data_functions import *
-from dotenv import load_dotenv
-import os
-import certifi
 import hashlib
 from aux_functions.db_functions import *
 import os
 import sys
+import certifi
+from dotenv import load_dotenv
+
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_dir)

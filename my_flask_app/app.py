@@ -234,4 +234,4 @@ def add_to_favorites():
 
 if __name__ == '__main__':
     #export_collections_to_excel("collections.xlsx")
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-from aux_functions.data_functions import *
 import hashlib
 from aux_functions.db_functions import *
 import os
 import sys
 import certifi
 from dotenv import load_dotenv
+import re
 
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

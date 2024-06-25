@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 import re
 from classes.classes import *
-
+import logging
 
 # Save fragrance data to an Excel file
 def save_to_excel(fragrances, base_path, scraper_name):
@@ -18,6 +18,37 @@ def save_to_excel(fragrances, base_path, scraper_name):
     df = pd.DataFrame(fragrances_data)
     df.to_excel(full_path, index=False)
     print(filename + " has been saved in " + full_path)
+
+
+def save_to_excel_nowarning(fragrances, base_path, collection_name):
+    data = []
+    for fragrance in fragrances:
+        data.append({
+            '_id': fragrance.get_id(),
+            'page': fragrance.page,
+            'is_set_or_pack': fragrance.is_set_or_pack,
+            'original_brand': fragrance.original_brand,
+            'clean_brand': fragrance.clean_brand,
+            'original_fragrance_name': fragrance.original_fragrance_name,
+            'website_clean_fragrance_name': fragrance.website_clean_fragrance_name,
+            'final_clean_fragrance_name': fragrance.final_clean_fragrance_name,
+            'quantity': fragrance.quantity,
+            'price_amount': fragrance.price_amount,
+            'price_currency': fragrance.price_currency,
+            'link': fragrance.link,
+            'website': fragrance.website,
+            'country': fragrance.country,
+            'last_updated_at': fragrance.last_updated_at,
+            'gender': fragrance.gender,
+            'price_history': fragrance.price_history,
+            'price_changed': fragrance.price_changed,
+            'price_alert_threshold': fragrance.price_alert_threshold
+        })
+
+    df = pd.DataFrame(data)
+    file_path = os.path.join(base_path, f"{collection_name}.xlsx")
+    df.to_excel(file_path, index=False, engine='openpyxl')
+    logging.info(f"Data saved to {file_path}")
 
 
 # Mapping of brand names to their standardized forms
@@ -55,6 +86,7 @@ BRAND_NAME_MAPPING = {
     'guerlain': 'Guerlain',
     'gres': 'Grès',
     'hermes': 'Hermès',
+    'Herm√®s': 'Hermès',
     'hilfiger': 'Tommy Hilfiger',
     'hugo': 'Hugo Boss',
     'issey': 'Issey Miyake',
@@ -110,7 +142,6 @@ def standardize_fragrance_names(string, brand):
     string = string.lower()
     string = string.replace('`', "'")
     string = string.replace('´', "'")
-    string = string.replace('¬≤', '²')
 
     # Replace "eau de toilette", "eau de parfum", "eau de cologne" with "edt", "edp", "edc" respectively
     string = re.sub(r'\beau de toilette\b', 'edt', string)
@@ -142,12 +173,16 @@ def standardize_fragrance_names(string, brand):
     title_cased_string = ' '.join(title_cased_words)
 
     # Ensure "ml" and "g" are maintained in lowercase
+    #5Ml -> 5ml
     title_cased_string = re.sub(r'(\d+)\s*ml', r'\1ml', title_cased_string, flags=re.IGNORECASE)
+    #5G -> 5g
     title_cased_string = re.sub(r'(\d+)\s*g', r'\1g', title_cased_string, flags=re.IGNORECASE)
+    #5Th -> 5th
+    title_cased_string = re.sub(r'(\d+)\s*th', r'\1th', title_cased_string, flags=re.IGNORECASE)
 
     # Check if the standardized brand name is at the beginning, add it if not
-    if not title_cased_string.lower().startswith(standardized_brand.lower()):
-        title_cased_string = f"{standardized_brand} {title_cased_string}"
+    # if not title_cased_string.lower().startswith(standardized_brand.lower()):
+    #     title_cased_string = f"{standardized_brand} {title_cased_string}"
 
     return title_cased_string
 

@@ -23,6 +23,7 @@ semaphore_value = 15
 retries_value = 5
 initial_delay_value = 3
 
+
 # Function to extract quantity from the fragrance name
 # def extract_quantity(fragrance_name):
 #     fragrance_name = re.sub(r'(?<=\d),(?=\d)', '.', fragrance_name, re.IGNORECASE)
@@ -43,29 +44,32 @@ def clean_fragrance_name_perfumedigital(fragrance_name):
 
     #removes quicne militros i.e LA VIE EST BELLE EDP 15 (QUINCE MILILITROS) ML @, Modified: LA VIE EST BELLE EDP 15  ML @
     #if re.search(r'\(quince mililitros\)', fragrance_name, flags=re.IGNORECASE):
-        #fragrance_name = re.sub(r'\(quince mililitros\)', '', fragrance_name, flags=re.IGNORECASE)
+    #fragrance_name = re.sub(r'\(quince mililitros\)', '', fragrance_name, flags=re.IGNORECASE)
 
     #adds ml if msising before @ i.e ARMANI IN LOVE WITH YOU EDP 100 @, Modified: ARMANI IN LOVE WITH YOU EDP 100 ml @
     if re.search(r'(\d+)\s*@$', fragrance_name, flags=re.IGNORECASE):
         fragrance_name = re.sub(r'(\d+)\s*@$', r'\1 ml @', fragrance_name, flags=re.IGNORECASE)
 
     #if re.search(r'\(tapon roto\)', fragrance_name, flags=re.IGNORECASE):
-        #fragrance_name = re.sub(r'\(tapon roto\)', '', fragrance_name, flags=re.IGNORECASE)
-
+    #fragrance_name = re.sub(r'\(tapon roto\)', '', fragrance_name, flags=re.IGNORECASE)
 
     fragrance_name = fragrance_name.lower()
     fragrance_name = re.sub(r'\(.*?\)', '', fragrance_name)
     fragrance_name = fragrance_name.replace('regular', '')
     fragrance_name = fragrance_name.replace('¬∫', 'º')
     fragrance_name = fragrance_name.replace('@', '(Tester)')
+    fragrance_name = fragrance_name.replace('¬≤', '')
+    fragrance_name = fragrance_name.replace('¬¥', "'")
 
     return fragrance_name
+
 
 # Function to parse the HTML content to extract fragrance information
 def parse(html, url):
     soup = BeautifulSoup(html, 'html.parser')
     fragrances = []
     price_currency = '€'
+    price_amount = 0.0
 
     for td in soup.find_all('td', align='center', style='width:33%;'):
         table = td.find('table')
@@ -74,12 +78,9 @@ def parse(html, url):
             brand = brand_tag.get_text(strip=True) if brand_tag else None
 
             link_tag = table.find('a', href=True)
+            #print(link_tag)
             img_tag = link_tag.find('img') if link_tag else None
             fragrance_name = img_tag['alt'].strip() if img_tag and 'alt' in img_tag.attrs else None
-
-            if not fragrance_name:
-                print("Fragrance name not found!")
-                continue
 
             price_info_tag = table.find('span', class_='productSpecialPrice')
             if price_info_tag:
@@ -88,31 +89,37 @@ def parse(html, url):
                     price_amount = float(price_text[-2].replace('€', ''))
 
             link = BASE_URL + link_tag['href'] if link_tag else None
+            print(link)
 
             is_set_or_pack = any(
                 keyword in fragrance_name.lower() for keyword in
-                ['lote', 'pack', 'packs', 'set', 'seis con 5', ' + ', 'caja'])
+                ['lote', 'pack', 'packs', 'set', 'seis con 5', ' + ', 'misteriosa'])
 
             #Specific perufmedigital name cleaning
-            cleaned_fragrance_name = standardize_fragrance_names(clean_fragrance_name_perfumedigital(fragrance_name), brand)
+            website_clean_fragrance_name = clean_fragrance_name_perfumedigital(fragrance_name)
+            cleaned_fragrance_name = standardize_fragrance_names(website_clean_fragrance_name, brand)
+
+            quantity = 0
 
             if is_set_or_pack:
                 quantity = 0
             else:
-                quantity_match = re.search(r'(\d+(\.\d+)?)\s*ml', fragrance_name, re.IGNORECASE)
+                quantity_match = re.search(r'(\d+(\.\d+)?)\s*ml', cleaned_fragrance_name, re.IGNORECASE)
                 if quantity_match:
                     quantity = float(quantity_match.group(1))
                     # Remove the quantity part from cleaned_fragrance_name
-                    cleaned_fragrance_name = re.sub(r'\b\d+(\.\d+)?\s*ml\b', '', cleaned_fragrance_name,
+                    final_cleaned_fragrance_name = re.sub(r'\b\d+(\.\d+)?\s*ml\b', '', cleaned_fragrance_name,
                                                     flags=re.IGNORECASE).strip()
+                else:
+                    print(f"Couldn't find quantity for pattern: {quantity_match}, fragrance: {cleaned_fragrance_name}")
 
-            # Standardize the fragrance name, ensuring the brand is included at the beginning if not already present
-            cleaned_fragrance_name = standardize_fragrance_names(cleaned_fragrance_name, brand)
 
             fragrance = FragranceItem(
-                brand=standardize_brand_names(brand),
+                original_brand=brand,
+                clean_brand=standardize_brand_names(brand),
                 original_fragrance_name=fragrance_name,
-                clean_fragrance_name=cleaned_fragrance_name,
+                website_clean_fragrance_name=clean_fragrance_name_perfumedigital(fragrance_name),
+                final_clean_fragrance_name=final_cleaned_fragrance_name,
                 quantity=quantity,
                 price_amount=price_amount,
                 price_currency=price_currency,
@@ -122,11 +129,13 @@ def parse(html, url):
                 last_updated_at=datetime.now(),
                 is_set_or_pack=is_set_or_pack,
                 gender=None,
-                price_alert_threshold=None
+                price_alert_threshold=None,
             )
-            fragrances.append(fragrance)
+            if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
+                fragrances.append(fragrance)
 
     return fragrances
+
 
 # Function to fetch gender information for a fragrance
 async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10, delay=2):
@@ -168,9 +177,15 @@ async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10,
         fragrance.gender = None
         return fragrance
 
+
 # Main function to orchestrate the scraping process
 async def main():
     start_time = time.time()
+
+    collection_name = "PerfumesDigital"
+
+    print(f"Started scraping {collection_name}")
+
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_URL) as response:
             raw_content = await response.read()
@@ -185,13 +200,12 @@ async def main():
             else:
                 print("Total pages info not found, defaulting to 1.")
                 quit()
-    selected_pages = 5
+    #selected_pages = total_pages
+    #selected_pages = 20
     urls = [
         f"https://perfumedigital.es/index.php?PASE={i * 15}&marca=&buscado=&ID_CATEGORIA=&ORDEN=&precio1=&precio2=#PRODUCTOS"
-        for i in range(selected_pages)
+        for i in (26, )
     ]
-
-    print("Starting to scrape pages...")
 
     html_pages = await gather_data(urls, parse)
 
@@ -207,40 +221,41 @@ async def main():
 
     print(f"Total fragrances scraped: {len(all_fragrances)}. Fetching gender information...")
 
+    if failed_pages:
+        print(f"Failed to scrape the following pages: {failed_pages}")
+
     semaphore = asyncio.Semaphore(semaphore_value)
     async with aiohttp.ClientSession() as session:
         all_fragrances = await asyncio.gather(
             *[fetch_gender_perfumedigital(fragrance, semaphore, session) for fragrance in all_fragrances])
 
-    base_path = r"D:\Drive Folder\Fragrances_DB\scrapers\PerfumesDigital\data"
+    print(f"Ended scraping {collection_name}")
+
+    base_path = os.path.join(os.getcwd(), 'data')  # Update this path as necessary
+    os.makedirs(base_path, exist_ok=True)
 
     try:
-        save_to_excel(all_fragrances, base_path, 'PerfumeDigital')
+        save_to_excel(all_fragrances, base_path, collection_name)
     except Exception as e:
         print(e)
 
     # try:
-    #     delete_collection("PerfumeDigital")
+    #     delete_collection(collection_name)
     # except Exception as e:
     #     print(e)
     #
-    # collection = db["PerfumeDigital"]
-    #
-    # print("Start: Inserting/Updating/Removing fragrances in MongoDB")
+    # print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
+    # collection = db[collection_name]
     # try:
     #     db_insert_update_remove(collection, all_fragrances)
     # except Exception as e:
-    #     print("Error Ocurred on Insert/Updated")
+    #     print("Error Occurred on Insert/Update/Remove")
     #     print(e)
-    #
-    # print("End: Inserting/Updating/Removing fragrances from MongoDB")
-
-    if failed_pages:
-        print(f"Failed to scrape the following pages: {failed_pages}")
+    # print(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()
-    print(f"Scraping completed in {end_time - start_time:.2f} seconds.")
+    print(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
+
 
 if __name__ == "__main__":
-    test_mongo_connection()
     asyncio.run(main())

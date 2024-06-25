@@ -76,7 +76,7 @@ async def fetch_data_from_ajax(session, url, page, retries=3, delay=5):
 
 # Function to determine the total number of pages
 async def get_total_pages(session, url):
-    page = 90
+    page = 82
     while page > 0:
         response = await fetch_data_from_ajax(session, url, page)
         if response is not None:
@@ -85,41 +85,53 @@ async def get_total_pages(session, url):
     return 1
 
 # Function to parse the fetched data
-def parse_ajax_data(html, url):
+def parse_ajax_data(html, url, page):
     soup = BeautifulSoup(html, 'html.parser')
     fragrances = []
     price_currency = '€'
 
     for div in soup.find_all('div', class_='item_producto'):
+        # Original brand
         brand_tag = div.find('div', class_='nombre_marca')
-        brand = brand_tag.get_text(strip=True) if brand_tag else None
+        original_brand = brand_tag.get_text(strip=True) if brand_tag else None
 
+        # Clean Brand
+        clean_brand = standardize_brand_names(original_brand)
+
+        # Original Fragrance Name
         name_tag = div.find('div', class_='nombre_grupo')
-        fragrance_name = name_tag.get_text(strip=True) if name_tag else None
-
-        link_tags = div.find_all('a', href=True)
-        link = link_tags[1]['href'] if len(link_tags) > 1 else (link_tags[0]['href'] if link_tags else None)
+        aux_fragrance_name = name_tag.get_text(strip=True) if name_tag else None
 
         aux_type_tag = div.find('div', class_='tipo_producto')
         aux_type = aux_type_tag.get_text(strip=True) if aux_type_tag else ""
 
+        original_fragrance_name = (aux_fragrance_name + " " + aux_type)
+
+        # Link
+        link_tags = div.find_all('a', href=True)
+        link = link_tags[1]['href'] if len(link_tags) > 1 else (link_tags[0]['href'] if link_tags else None)
+
+        # Gender
         gender_tag = div.find('div', class_='sexo')
         gender = gender_tag.get_text(strip=True) if gender_tag else ""
         gender = 'Men' if 'Hombre' in gender else 'Women'
 
-        clean_fragrance_name = standardize_fragrance_names(fragrance_name + " " + aux_type, brand)
+        # Full Clean Fragrance Name
+        final_clean_fragrance_name = standardize_fragrance_names(original_fragrance_name, original_brand)
 
         for variant in div.find_all('div', class_='item_tamanyo'):
             price_amount = float(variant['data-pp'].replace(',', '.'))
             quantity_match = re.search(r'(\d+)', variant.get_text(strip=True))
-            variant_quantity = int(quantity_match.group(1)) if quantity_match else 0
+            quantity = int(quantity_match.group(1)) if quantity_match else 0
             is_set_or_pack = True if not quantity_match else False
 
             fragrance = FragranceItem(
-                brand=standardize_brand_names(brand),
-                original_fragrance_name=fragrance_name + " " + aux_type,
-                clean_fragrance_name=clean_fragrance_name,
-                quantity=variant_quantity,
+                original_brand=original_brand,
+                clean_brand=clean_brand,
+                original_fragrance_name=original_fragrance_name,
+                website_clean_fragrance_name=original_fragrance_name,
+                final_clean_fragrance_name=final_clean_fragrance_name,
+                quantity=quantity,
                 price_amount=price_amount,
                 price_currency=price_currency,
                 link=link,
@@ -127,6 +139,7 @@ def parse_ajax_data(html, url):
                 country=["PT", "ES"],
                 last_updated_at=datetime.now(),
                 is_set_or_pack=is_set_or_pack,
+                page=page,
                 gender=gender,
                 price_alert_threshold=None
             )
@@ -151,9 +164,9 @@ async def main():
         responses = await asyncio.gather(*tasks)
 
     all_fragrances = []
-    for response in responses:
+    for page, response in enumerate(responses, start=1):
         if response:
-            parsed_data = parse_ajax_data(response, AJAX_URL)
+            parsed_data = parse_ajax_data(response, AJAX_URL, page)
             all_fragrances.extend(parsed_data)
 
     print(f"Ended scraping {collection_name}")
@@ -172,7 +185,9 @@ async def main():
     #     print(e)
 
     print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
+
     collection = db[collection_name]
+
     try:
         db_insert_update_remove(collection, all_fragrances)
     except Exception as e:
@@ -181,6 +196,7 @@ async def main():
     print(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()
+
     print(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
 
 if __name__ == "__main__":

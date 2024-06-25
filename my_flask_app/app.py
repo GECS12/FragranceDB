@@ -1,18 +1,18 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import hashlib
 import os
+import re
 import sys
 import certifi
 from dotenv import load_dotenv
-import re
+from pymongo import MongoClient
 
 # Ensure the base directory is in the sys.path
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(base_dir)
+base_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(base_dir)
+sys.path.append(root_dir)
 
-from aux_functions.db_functions import *
 from classes.classes import FragranceItem
-
 
 load_dotenv()
 
@@ -26,16 +26,15 @@ db = client['FragrancesDatabase']
 collection_perfumes_digital = db['PerfumesDigital']
 collection_perfumes_24h = db['Perfumes24h']
 collection_perfume_clique = db['PerfumeClique']
-users_collection = db['users']  # Add users collection for managing favorites
-
+users_collection = db['users']
 
 def get_all_fragrances():
     all_fragrances = []
 
     try:
         if collection_perfumes_digital.count_documents({}) > 0:
-            all_fragrances.extend(list(collection_perfumes_digital.find({}, {'_id': 0, 'brand': 1,
-                                                                             'clean_fragrance_name': 1, 'quantity': 1,
+            all_fragrances.extend(list(collection_perfumes_digital.find({}, {'_id': 0, 'clean_brand': 1,
+                                                                             'final_clean_fragrance_name': 1, 'quantity': 1,
                                                                              'price_amount': 1, 'link': 1, 'website': 1,
                                                                              'gender': 1})))
     except Exception as e:
@@ -43,19 +42,17 @@ def get_all_fragrances():
 
     try:
         if collection_perfumes_24h.count_documents({}) > 0:
-            all_fragrances.extend(list(collection_perfumes_24h.find({},
-                                                                    {'_id': 0, 'brand': 1, 'clean_fragrance_name': 1,
-                                                                     'quantity': 1, 'price_amount': 1, 'link': 1,
-                                                                     'website': 1, 'gender': 1})))
+            all_fragrances.extend(list(collection_perfumes_24h.find({}, {'_id': 0, 'clean_brand': 1, 'final_clean_fragrance_name': 1,
+                                                                         'quantity': 1, 'price_amount': 1, 'link': 1,
+                                                                         'website': 1, 'gender': 1})))
     except Exception as e:
         print(f"Error querying Perfumes24h: {e}")
 
     try:
         if collection_perfume_clique.count_documents({}) > 0:
-            all_fragrances.extend(list(collection_perfume_clique.find({},
-                                                                      {'_id': 0, 'brand': 1, 'clean_fragrance_name': 1,
-                                                                       'quantity': 1, 'price_amount': 1, 'link': 1,
-                                                                       'website': 1, 'gender': 1})))
+            all_fragrances.extend(list(collection_perfume_clique.find({}, {'_id': 0, 'clean_brand': 1, 'final_clean_fragrance_name': 1,
+                                                                           'quantity': 1, 'price_amount': 1, 'link': 1,
+                                                                           'website': 1, 'gender': 1})))
     except Exception as e:
         print(f"Error querying PerfumeClique: {e}")
 
@@ -85,7 +82,7 @@ def autocomplete_brand():
 
         for collection in collections:
             try:
-                brands = collection.distinct("brand", {"brand": regex})
+                brands = collection.distinct("clean_brand", {"clean_brand": regex})
                 all_brands.update(brands)
             except Exception as e:
                 print(f"Error querying {collection.name}: {e}")
@@ -106,7 +103,7 @@ def autocomplete_fragrance():
 
         for collection in collections:
             try:
-                fragrances = collection.distinct("clean_fragrance_name", {"clean_fragrance_name": regex})
+                fragrances = collection.distinct("final_clean_fragrance_name", {"final_clean_fragrance_name": regex})
                 all_fragrances.update(fragrances)
             except Exception as e:
                 print(f"Error querying {collection.name}: {e}")
@@ -127,7 +124,7 @@ def search_by_brand():
 
         for collection in collections:
             try:
-                fragrances = list(collection.find({"brand": regex}, {'_id': 0}))
+                fragrances = list(collection.find({"clean_brand": regex}, {'_id': 0}))
                 all_fragrances.extend(fragrances)
             except Exception as e:
                 print(f"Error querying {collection.name}: {e}")
@@ -147,7 +144,7 @@ def search_by_fragrance():
 
         for collection in collections:
             try:
-                fragrances = list(collection.find({"clean_fragrance_name": regex}, {'_id': 0}))
+                fragrances = list(collection.find({"final_clean_fragrance_name": regex}, {'_id': 0}))
                 all_fragrances.extend(fragrances)
             except Exception as e:
                 print(f"Error querying {collection.name}: {e}")
@@ -216,7 +213,7 @@ def add_to_favorites():
     if 'username' in session:
         fragrance = request.json
         if not fragrance.get('_id'):
-            unique_string = f"{fragrance['brand']}{fragrance['clean_fragrance_name']}{fragrance['quantity']}{fragrance['price_amount']}{fragrance['website']}"
+            unique_string = f"{fragrance['clean_brand']}{fragrance['final_clean_fragrance_name']}{fragrance['quantity']}{fragrance['price_amount']}{fragrance['website']}"
             fragrance['_id'] = hashlib.md5(unique_string.encode()).hexdigest()
         fragrance_id = fragrance.get('_id')
         if fragrance_id:
@@ -233,5 +230,4 @@ def add_to_favorites():
 
 
 if __name__ == '__main__':
-    #export_collections_to_excel("collections.xlsx")
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

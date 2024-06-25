@@ -81,7 +81,7 @@ def db_insert_update_remove(collection, fragrances, batch_size=500, delay=1):
             if existing_doc["price_amount"] != fragrance.price_amount:
                 fragrance.price_changed = True
                 update_count += 1
-                updated_fragrances.append(fragrance.clean_fragrance_name)
+                updated_fragrances.append(fragrance.final_clean_fragrance_name)  # Updated line
             else:
                 fragrance.price_changed = False
 
@@ -89,13 +89,13 @@ def db_insert_update_remove(collection, fragrances, batch_size=500, delay=1):
 
             # Check for price drop alert
             if fragrance.price_alert_threshold and fragrance.price_amount < fragrance.price_alert_threshold:
-                print(f"Alert! Price drop for {fragrance.clean_fragrance_name}: {fragrance.price_amount}{fragrance.price_currency}")
+                print(f"Alert! Price drop for {fragrance.final_clean_fragrance_name}: {fragrance.price_amount}{fragrance.price_currency}")  # Updated line
         else:
             # New document, initialize price history
             fragrance.price_history = [price_history_entry]
             fragrance.price_changed = False
             new_count += 1
-            new_fragrances.append(fragrance.clean_fragrance_name)
+            new_fragrances.append(fragrance.final_clean_fragrance_name)  # Updated line
 
         fragrance_dict = fragrance.to_dict()
         if existing_doc:
@@ -115,7 +115,7 @@ def db_insert_update_remove(collection, fragrances, batch_size=500, delay=1):
     ids_to_remove = all_ids_in_db - existing_ids
     remove_count = len(ids_to_remove)
     if ids_to_remove:
-        removed_fragrances = [doc['clean_fragrance_name'] for doc in collection.find({"_id": {"$in": list(ids_to_remove)}})]
+        removed_fragrances = [doc['final_clean_fragrance_name'] for doc in collection.find({"_id": {"$in": list(ids_to_remove)}})]  # Updated line
         try:
             collection.delete_many({"_id": {"$in": list(ids_to_remove)}})
         except BulkWriteError as bwe:
@@ -156,6 +156,7 @@ def db_insert_update_remove(collection, fragrances, batch_size=500, delay=1):
         for name in removed_fragrances:
             count_removed += 1
             #print(f"{count_removed} - {name}")
+
 
 
 def get_all_fragrances(collection):

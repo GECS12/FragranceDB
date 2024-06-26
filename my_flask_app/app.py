@@ -4,6 +4,8 @@ import os
 import re
 import sys
 import certifi
+import logging
+
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
@@ -17,6 +19,8 @@ from aux_functions.db_functions import export_collections_to_excel
 
 load_dotenv()
 
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 

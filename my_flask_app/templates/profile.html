@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Profile</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
 </head>
 <body>
     <h2>User Profile</h2>
@@ -21,26 +22,78 @@
                 <th>Price (€)</th>
                 <th>Website</th>
                 <th>Price Alert Threshold (€)</th>
+                <th>Remove</th>
             </tr>
         </thead>
         <tbody>
             {% for fragrance in user['favorites'] %}
-            <tr>
-                <td>{{ fragrance.brand }}</td>
-                <td>{{ fragrance.fragrance_name }}</td>
+            <tr data-id="{{ fragrance._id }}">
+                <td>{{ fragrance.clean_brand }}</td>
+                <td>{{ fragrance.final_clean_fragrance_name }}</td>
                 <td>{{ fragrance.quantity }}</td>
                 <td>{{ fragrance.price_amount }}</td>
                 <td>{{ fragrance.website }}</td>
                 <td>
-                    <form method="POST">
-                        <input type="hidden" name="fragrance_id" value="{{ fragrance._id }}">
-                        <input type="number" name="price_alert_threshold" value="{{ fragrance.price_alert_threshold or '' }}" step="0.01" required>
-                        <button type="submit">Set</button>
-                    </form>
+                    <input type="number" class="price-alert-threshold" value="{{ fragrance.price_alert_threshold or '' }}" step="0.01" required>
+                    <button class="set-price-alert">Set</button>
+                </td>
+                <td>
+                    <button class="remove-favorite">Remove</button>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <script>
+        $(document).ready(function() {
+            $('.set-price-alert').on('click', function() {
+                var row = $(this).closest('tr');
+                var fragranceId = row.data('id');
+                var priceAlertThreshold = row.find('.price-alert-threshold').val();
+
+                $.ajax({
+                    url: '/profile',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ fragrance_id: fragranceId, price_alert_threshold: priceAlertThreshold }),
+                    success: function(response) {
+                        console.log(response); // Add this line to log the server response
+                        if (response.success) {
+                            alert("Price alert threshold updated successfully!");
+                        } else {
+                            alert("Failed to update price alert threshold: " + response.error);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.log(xhr.responseText); // Add this line to log the server response
+                        alert("An error occurred: " + xhr.responseText);
+                    }
+                });
+            });
+
+            $('.remove-favorite').on('click', function() {
+                var row = $(this).closest('tr');
+                var fragranceId = row.data('id');
+
+                $.ajax({
+                    url: '/remove_from_favorites',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ _id: fragranceId }),
+                    success: function(response) {
+                        if (response.success) {
+                            row.remove();
+                        } else {
+                            alert("Failed to remove from favorites: " + response.error);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert("An error occurred: " + xhr.responseText);
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

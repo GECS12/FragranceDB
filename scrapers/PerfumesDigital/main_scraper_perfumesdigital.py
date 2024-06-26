@@ -23,7 +23,7 @@ load_dotenv()
 
 # Base URL for PerfumeDigital
 BASE_URL = "https://perfumedigital.es/"
-semaphore_value = 10
+semaphore_value = 15
 # retries_value = 5
 # initial_delay_value = 3
 
@@ -174,13 +174,14 @@ def parse(html, url):
                 price_amount=price_amount,
                 price_currency=price_currency,
                 link=link,
-                website="PerfumeDigital.es",
+                website="perfumeDigital.es",
                 country=["PT", "ES"],
                 last_updated_at=datetime.now(),
                 is_set_or_pack=is_set_or_pack,
                 page=page,
                 gender=None,
-                price_alert_threshold=None
+                price_alert_threshold=None,
+                is_in_stock=True
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
                 fragrances.append(fragrance)
@@ -189,9 +190,9 @@ def parse(html, url):
 
 
 # Function to fetch gender information for a fragrance
-async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10, delay=3):
+async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10, delay=2):
     async with semaphore:
-        await asyncio.sleep(random.uniform(1, 2))  # Small initial delay before fetching
+        await asyncio.sleep(random.uniform(1.5, 2.5))  # Small initial delay before fetching
         for attempt in range(retries):
             try:
                 async with session.get(fragrance.link, timeout=15) as response:
@@ -296,10 +297,10 @@ async def main():
     except Exception as e:
         logging.error(f"Error saving to Excel: {e}")
 
-    # try:
-    #     delete_collection(collection_name)
-    # except Exception as e:
-    #     print(e)
+    try:
+        delete_collection(collection_name)
+    except Exception as e:
+        print(e)
 
     print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
     collection = db[collection_name]

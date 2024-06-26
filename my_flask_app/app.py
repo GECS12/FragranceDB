@@ -13,6 +13,7 @@ root_dir = os.path.dirname(base_dir)
 sys.path.append(root_dir)
 
 from classes.classes import FragranceItem
+from aux_functions.db_functions import export_collections_to_excel
 
 load_dotenv()
 
@@ -26,6 +27,7 @@ db = client['FragrancesDatabase']
 collection_perfumes_digital = db['PerfumesDigital']
 collection_perfumes_24h = db['Perfumes24h']
 collection_perfume_clique = db['PerfumeClique']
+collection_mass_perfumarias = db['MassPerfumarias']
 users_collection = db['users']
 
 def get_all_fragrances():
@@ -56,6 +58,14 @@ def get_all_fragrances():
     except Exception as e:
         print(f"Error querying PerfumeClique: {e}")
 
+    try:
+        if collection_mass_perfumarias.count_documents({}) > 0:
+            all_fragrances.extend(list(collection_perfume_clique.find({}, {'_id': 0, 'clean_brand': 1, 'final_clean_fragrance_name': 1,
+                                                                           'quantity': 1, 'price_amount': 1, 'link': 1,
+                                                                           'website': 1, 'gender': 1})))
+    except Exception as e:
+        print(f"Error querying MassPerfumarias: {e}")
+
     return all_fragrances
 
 
@@ -78,7 +88,7 @@ def autocomplete_brand():
 
     if query:
         regex = re.compile(f'{query}', re.IGNORECASE)
-        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique]
+        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique, collection_mass_perfumarias]
 
         for collection in collections:
             try:
@@ -99,7 +109,7 @@ def autocomplete_fragrance():
 
     if query:
         regex = re.compile(f'{query}', re.IGNORECASE)
-        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique]
+        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique, collection_mass_perfumarias]
 
         for collection in collections:
             try:
@@ -120,7 +130,7 @@ def search_by_brand():
 
     if query:
         regex = re.compile('.*' + '.*'.join(query.split()) + '.*', re.IGNORECASE)
-        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique]
+        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique, collection_mass_perfumarias]
 
         for collection in collections:
             try:
@@ -140,7 +150,7 @@ def search_by_fragrance():
 
     if query:
         regex = re.compile('.*' + '.*'.join(query.split()) + '.*', re.IGNORECASE)
-        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique]
+        collections = [collection_perfumes_digital, collection_perfumes_24h, collection_perfume_clique, collection_mass_perfumarias]
 
         for collection in collections:
             try:
@@ -196,16 +206,24 @@ def profile():
     if 'username' in session:
         user = users_collection.find_one({"username": session['username']})
         if request.method == 'POST':
-            # Update price alert threshold
-            fragrance_id = request.form.get('fragrance_id')
-            price_alert_threshold = request.form.get('price_alert_threshold')
-            if fragrance_id and price_alert_threshold:
-                users_collection.update_one(
-                    {"username": session['username'], "favorites._id": fragrance_id},
-                    {"$set": {"favorites.$.price_alert_threshold": float(price_alert_threshold)}}
-                )
+            if request.content_type == 'application/json':
+                data = request.json
+                fragrance_id = data.get('fragrance_id')
+                price_alert_threshold = data.get('price_alert_threshold')
+                if fragrance_id and price_alert_threshold is not None:
+                    try:
+                        users_collection.update_one(
+                            {"username": session['username'], "favorites._id": fragrance_id},
+                            {"$set": {"favorites.$.price_alert_threshold": float(price_alert_threshold)}}
+                        )
+                        return jsonify({"success": True})
+                    except Exception as e:
+                        print(f"Error updating price alert threshold: {e}")
+                        return jsonify({"success": False, "error": str(e)}), 500
+                return jsonify({"success": False, "error": "Missing data"}), 400
         return render_template('profile.html', user=user)
     return redirect(url_for('signin'))
+
 
 
 @app.route('/add_to_favorites', methods=['POST'])
@@ -228,6 +246,27 @@ def add_to_favorites():
         return jsonify({"success": False, "error": "Fragrance ID missing"}), 400
     return jsonify({"success": False, "error": "Unauthorized"}), 401
 
+@app.route('/remove_from_favorites', methods=['POST'])
+def remove_from_favorites():
+    if 'username' in session:
+        if request.content_type == 'application/json':
+            fragrance_id = request.json.get('_id')
+        else:
+            fragrance_id = request.form.get('_id')
+        if fragrance_id:
+            try:
+                users_collection.update_one(
+                    {"username": session['username']},
+                    {"$pull": {"favorites": {"_id": fragrance_id}}}
+                )
+                return jsonify({"success": True})
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "Fragrance ID missing"}), 400
+    return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+
 
 if __name__ == '__main__':
+    #export_collections_to_excel("data/All_Fragrances.xlsx")
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

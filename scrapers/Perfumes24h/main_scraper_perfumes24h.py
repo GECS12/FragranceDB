@@ -4,6 +4,7 @@ from datetime import datetime
 import time
 import aiohttp
 import asyncio
+import logging
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from classes.classes import FragranceItem
@@ -12,6 +13,8 @@ from aux_functions.db_functions import db_insert_update_remove, delete_collectio
 from my_flask_app.app import db
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
 
 # Base URL for AJAX endpoint
 AJAX_URL = "https://perfumes24h.com/ajax/buscador.filtros_v2.php"
@@ -61,17 +64,17 @@ async def fetch_data_from_ajax(session, url, page, retries=3, delay=5):
         try:
             async with session.get(url, headers=HEADERS, params=params) as response:
                 if response.status == 200:
-                    print(f"Scraping page {page}")
+                    logging.info(f"Scraping page {page}")
                     response_text = await response.text()
                     if response_text == "-1":
                         return None
                     return response_text
                 else:
-                    print(f"Failed to fetch data for page {page}, status code: {response.status}")
+                    logging.info(f"Failed to fetch data for page {page}, status code: {response.status}")
         except Exception as e:
-            print(f"Error fetching page {page}: {e}")
+            logging.info(f"Error fetching page {page}: {e}")
         await asyncio.sleep(delay)
-    print(f"Failed to fetch data for page {page} after {retries} retries")
+    logging.info(f"Failed to fetch data for page {page} after {retries} retries")
     return None
 
 # Function to determine the total number of pages
@@ -135,13 +138,15 @@ def parse_ajax_data(html, url, page):
                 price_amount=price_amount,
                 price_currency=price_currency,
                 link=link,
-                website="Perfumes24h.com",
+                website="perfumes24h.com",
                 country=["PT", "ES"],
                 last_updated_at=datetime.now(),
                 is_set_or_pack=is_set_or_pack,
                 page=page,
                 gender=gender,
-                price_alert_threshold=None
+                price_alert_threshold=None,
+                is_in_stock=True
+
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
                 fragrances.append(fragrance)
@@ -154,11 +159,11 @@ async def main():
 
     collection_name = "Perfumes24h"
 
-    print(f"Started scraping {collection_name}")
+    logging.info(f"Started scraping {collection_name}")
 
     async with aiohttp.ClientSession() as session:
         total_pages = await get_total_pages(session, AJAX_URL)
-        print(f"Total pages to scrape: {total_pages}")
+        logging.info(f"Total pages to scrape: {total_pages}")
 
         tasks = [fetch_data_from_ajax(session, AJAX_URL, page) for page in range(1, total_pages + 1)]
         responses = await asyncio.gather(*tasks)
@@ -169,7 +174,9 @@ async def main():
             parsed_data = parse_ajax_data(response, AJAX_URL, page)
             all_fragrances.extend(parsed_data)
 
-    print(f"Ended scraping {collection_name}")
+    logging.info(f"Ended scraping {collection_name}")
+
+    logging.info(f"Total fragrances scraped: {len(all_fragrances)}. Fetching gender information...")
 
     base_path = os.path.join(os.getcwd(), 'data')  # Update this path as necessary
     os.makedirs(base_path, exist_ok=True)
@@ -177,27 +184,27 @@ async def main():
     try:
         save_to_excel(all_fragrances, base_path, collection_name)
     except Exception as e:
-        print(e)
+        logging.info(e)
 
-    # try:
-    #     delete_collection(collection_name)
-    # except Exception as e:
-    #     print(e)
+    try:
+        delete_collection(collection_name)
+    except Exception as e:
+        logging.info(e)
 
-    print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
+    logging.info(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
 
     collection = db[collection_name]
 
     try:
         db_insert_update_remove(collection, all_fragrances)
     except Exception as e:
-        print("Error Occurred on Insert/Update/Remove")
-        print(e)
-    print(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
+        logging.info("Error Occurred on Insert/Update/Remove")
+        logging.info(e)
+    logging.info(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()
 
-    print(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
+    logging.info(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
 
 if __name__ == "__main__":
     asyncio.run(main())

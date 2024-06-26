@@ -138,21 +138,21 @@ def db_insert_update_remove(collection, fragrances, batch_size=500, delay=1):
 
     if new_count > 0:
         count_inserted = 0
-        print("Inserted fragrances:")
+        #print("Inserted fragrances:")
         for name in new_fragrances:
             count_inserted += 1
             #print(f"{count_inserted} - {name}")
 
     if update_count > 0:
         count_updated = 0
-        print("Updated fragrances:")
+        #print("Updated fragrances:")
         for name in updated_fragrances:
             count_updated += 1
             #print(f"{count_updated} - {name}")
 
     if remove_count > 0:
         count_removed = 0
-        print("Removed fragrances:")
+        #print("Removed fragrances:")
         for name in removed_fragrances:
             count_removed += 1
             #print(f"{count_removed} - {name}")
@@ -199,3 +199,5 @@ def export_collections_to_excel(output_file):
 def insert_user(db, user):
     users_collection = db["users"]
     users_collection.insert_one(user.to_dict())
+
+

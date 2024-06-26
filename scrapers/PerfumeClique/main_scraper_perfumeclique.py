@@ -11,8 +11,11 @@ from aux_functions.db_functions import db_insert_update_remove, delete_collectio
 from aux_functions.data_functions import standardize_brand_names, standardize_fragrance_names, save_to_excel
 from my_flask_app.mongo import db
 import chardet
+import logging
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
 
 # Base URLs for men's and women's fragrances
 BASE_URL = "https://www.perfume-clique.pt"
@@ -65,7 +68,7 @@ def parse(html, url, page):
 
             is_set_or_pack = any(
                 keyword in original_fragrance_name.lower() for keyword in
-                ['set', ' + ', 'balm', 'lotion', 'deodorant', ' & ', 'soap'])
+                ['set', ' + ', 'balm', 'lotion', 'deodorant', 'soap'])
 
             # Clean brand
             clean_brand = standardize_brand_names(original_brand)
@@ -96,13 +99,14 @@ def parse(html, url, page):
                 price_amount=price_amount,
                 price_currency=price_currency,
                 link=link,
-                website="PerfumeClique.pt",
+                website="perfume-clique.pt",
                 country=["PT"],
                 last_updated_at=datetime.now(),
                 is_set_or_pack=is_set_or_pack,
                 page=page,
                 gender=gender,
-                price_alert_threshold=None
+                price_alert_threshold=None,
+                is_in_stock=True
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
                 fragrances.append(fragrance)
@@ -146,6 +150,9 @@ async def fetch_data_from_page(session, url, page):
 # Main function to orchestrate the scraping process
 async def main():
     start_time = time.time()
+    collection_name = "PerfumeClique"
+
+    logging.info(f"Started scraping {collection_name}")
 
     men_fragrances = await scrape_category(MEN_URL)
     women_fragrances = await scrape_category(WOMEN_URL)
@@ -155,32 +162,33 @@ async def main():
     base_path = os.path.join(os.getcwd(), 'data')  # Update this path as necessary
     os.makedirs(base_path, exist_ok=True)
 
-    # Excel and DB
-    collection_name = "PerfumeClique"
+    logging.info(f"Ended scraping {collection_name}")
+
+    logging.info(f"Total fragrances scraped: {len(all_fragrances)}. Fetching gender information...")
 
     try:
         save_to_excel(all_fragrances, base_path, collection_name)
     except Exception as e:
-        print(e)
+        logging.info(e)
 
     try:
         delete_collection(collection_name)
     except Exception as e:
-        print(e)
+        logging.info(e)
 
     collection = db[collection_name]
 
-    print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
+    logging.info(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
     try:
         db_insert_update_remove(collection, all_fragrances)
     except Exception as e:
-        print("Error Occurred on Insert/Update/Remove")
-        print(e)
+        logging.info("Error Occurred on Insert/Update/Remove")
+        logging.info(e)
 
-    print(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
+    logging.info(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()
-    print(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
+    logging.info(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
 
 
 if __name__ == "__main__":

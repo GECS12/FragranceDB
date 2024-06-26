@@ -12,6 +12,7 @@ from aiohttp import ClientConnectorError, ClientPayloadError, ServerDisconnected
 import chardet
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from aux_functions.data_functions import standardize_brand_names, standardize_fragrance_names, save_to_excel
 from aux_functions.async_functions import gather_data
@@ -24,10 +25,11 @@ load_dotenv()
 # Base URL for PerfumeDigital
 BASE_URL = "https://perfumedigital.es/"
 semaphore_value = 10
-# retries_value = 5
-# initial_delay_value = 3
-
 logging.basicConfig(level=logging.INFO)
+
+# Initialize Motor client
+motor_client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
+motor_db = motor_client[os.getenv("MONGO_DB_NAME")]
 
 
 # Function to clean fragrance names specific to PerfumeDigital
@@ -180,7 +182,8 @@ def parse(html, url):
                 is_set_or_pack=is_set_or_pack,
                 page=page,
                 gender=None,
-                price_alert_threshold=None
+                price_alert_threshold=None,
+                is_in_stock=True
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
                 fragrances.append(fragrance)
@@ -189,16 +192,26 @@ def parse(html, url):
 
 
 # Function to fetch gender information for a fragrance
-async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10, delay=3):
+async def fetch_gender_perfumedigital(fragrance, semaphore, session, collection, retries=10, delay=3):
     async with semaphore:
         await asyncio.sleep(random.uniform(1, 2))  # Small initial delay before fetching
+
+        # Check if the gender information is already stored in the database
+        stored_fragrance = await collection.find_one({"_id": fragrance.get_id()}, {"gender": 1})
+        if stored_fragrance and stored_fragrance.get("gender"):
+            fragrance.gender = stored_fragrance["gender"]
+            logging.info(
+                f"Gender found for {fragrance.get_final_clean_fragrance_name()} at {fragrance.get_link()}")
+            return fragrance
+        else:
+            logging.info(f"Couldn't find gender for {fragrance.get_final_clean_fragrance_name()} at {fragrance.get_link()}")
+
         for attempt in range(retries):
             try:
                 async with session.get(fragrance.link, timeout=15) as response:
                     raw_content = await response.read()
                     result = chardet.detect(raw_content)
                     encoding = result['encoding'] if result['encoding'] is not None else 'utf-8'
-                    # logging.info(f"Detected encoding for {fragrance.link}: {encoding}")
                     html = raw_content.decode(encoding, errors='ignore')
                     soup = BeautifulSoup(html, 'html.parser')
 
@@ -212,12 +225,17 @@ async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10,
                             fragrance.gender = 'Women'
                         elif 'Hombre' in gender_tag.text:
                             fragrance.gender = 'Men'
+
+                        # Store the gender information in the database
+                        await collection.update_one({"_id": fragrance.get_id()}, {"$set": {"gender": fragrance.gender}},
+                                              upsert=True)
                         return fragrance
 
                     fragrance.gender = None
                     return fragrance
 
-            except (ClientConnectorError, ClientPayloadError, ServerDisconnectedError, asyncio.TimeoutError) as e:
+            except (aiohttp.ClientConnectorError, aiohttp.ClientPayloadError, ServerDisconnectedError,
+                    asyncio.TimeoutError) as e:
                 logging.error(f"Network error ({type(e).__name__}) fetching gender for {fragrance.link}: {e}")
             except ValueError as e:
                 logging.error(f"ValueError fetching gender for {fragrance.link}: {e}")
@@ -237,7 +255,6 @@ async def main():
     start_time = time.time()
 
     collection_name = "PerfumesDigital"
-
     logging.info(f"Started scraping {collection_name}")
 
     async with aiohttp.ClientSession() as session:
@@ -256,12 +273,11 @@ async def main():
                 total_pages = 1
 
     selected_pages = total_pages
-    # selected_pages = 10
+    selected_pages = 5
     urls = [
         (f"https://perfumedigital.es/index.php?PASE={i * 15}&marca=&buscado=&ID_CATEGORIA=&ORDEN=&precio1=&precio2"
          f"=#PRODUCTOS")
         for i in range(selected_pages)
-        # for i in (14, 43, 48, 84, 85, 123, 126, 132, 175, 188, 189)
     ]
 
     html_pages = await gather_data(urls, parse)
@@ -282,9 +298,11 @@ async def main():
         logging.info(f"Failed to scrape the following pages: {failed_pages}")
 
     semaphore = asyncio.Semaphore(semaphore_value)
+    collection = motor_db[collection_name]
+
     async with aiohttp.ClientSession() as session:
         all_fragrances = await asyncio.gather(
-            *[fetch_gender_perfumedigital(fragrance, semaphore, session) for fragrance in all_fragrances])
+            *[fetch_gender_perfumedigital(fragrance, semaphore, session, collection) for fragrance in all_fragrances])
 
     logging.info(f"Ended scraping {collection_name}")
 
@@ -296,19 +314,19 @@ async def main():
     except Exception as e:
         logging.error(f"Error saving to Excel: {e}")
 
-    try:
-        delete_collection(collection_name)
-    except Exception as e:
-        print(e)
+    # try:
+    #     delete_collection(collection_name)
+    # except Exception as e:
+    #     logging.info(e)
 
-    print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
-    collection = db[collection_name]
-    try:
-        db_insert_update_remove(collection, all_fragrances)
-    except Exception as e:
-        print("Error Occurred on Insert/Update/Remove")
-        print(e)
-    print(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
+    # logging.info(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
+    # collection = db[collection_name]
+    # try:
+    #     db_insert_update_remove(collection, all_fragrances)
+    # except Exception as e:
+    #     logging.info("Error Occurred on Insert/Update/Remove")
+    #     logging.info(e)
+    # logging.info(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()
     logging.info(f"{collection_name} process took {end_time - start_time:.2f} seconds.")

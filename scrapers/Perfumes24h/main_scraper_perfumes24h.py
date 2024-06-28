@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from classes.classes import FragranceItem
 from aux_functions.data_functions import standardize_fragrance_names, standardize_brand_names, save_to_excel
 from aux_functions.db_functions import db_insert_update_remove, delete_collection
-from my_flask_app.app import db
+from my_flask_app.app_backup import db
 
 load_dotenv()
 
@@ -145,7 +145,7 @@ def parse_ajax_data(html, url, page):
                 page=page,
                 gender=gender,
                 price_alert_threshold=None,
-                is_in_stock=True
+                is_in_stock="Yes"
 
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
@@ -184,12 +184,12 @@ async def main():
     try:
         save_to_excel(all_fragrances, base_path, collection_name)
     except Exception as e:
-        logging.info(e)
+        logging.error(f"Error: {e}")
 
     try:
         delete_collection(collection_name)
     except Exception as e:
-        logging.info(e)
+        logging.error(f"Error deleting collection {collection_name}: {e}")
 
     logging.info(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
 
@@ -199,7 +199,7 @@ async def main():
         db_insert_update_remove(collection, all_fragrances)
     except Exception as e:
         logging.info("Error Occurred on Insert/Update/Remove")
-        logging.info(e)
+        logging.error(f"Error: {e}")
     logging.info(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()

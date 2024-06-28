@@ -176,6 +176,7 @@ def update_db_brand(collection, old_brand, new_brand):
     )
     return result.matched_count, result.modified_count
 
+# Works but data is not correct, must fix
 def export_collections_to_excel(output_file):
     db = get_database()
     collections = db.list_collection_names()
@@ -201,3 +202,15 @@ def insert_user(db, user):
     users_collection.insert_one(user.to_dict())
 
 
+def get_existing_ids(collection):
+    """
+    Retrieve all existing _ids from the specified MongoDB collection.
+
+    :param collection: The MongoDB collection object
+    :return: A set of existing _ids
+    """
+    return {doc['_id'] for doc in collection.find({}, {"_id": 1})}
+
+def get_fragrance_gender_by_id(collection, fragrance_id):
+    doc = collection.find_one({"_id": fragrance_id})
+    return doc.get('gender', None) if doc else None

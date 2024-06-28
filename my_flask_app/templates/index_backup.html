@@ -116,10 +116,9 @@
                         <th>Fragrance Name</th>
                         <th>Quantity (ML)</th>
                         <th>Price (€)</th>
-                        <th>Gender</th>
-                        <th>In Stock</th>
                         <th>Link</th>
                         <th>Website</th>
+                        <th>Gender</th>
                         {% if 'username' in session %}
                         <th>Favorite</th>
                         {% endif %}
@@ -140,18 +139,15 @@
                 { "data": "final_clean_fragrance_name" },
                 { "data": "quantity" },
                 { "data": "price_amount" },
-                { "data": "gender" },
-                { "data": "is_in_stock" },
                 { "data": "link", "render": function(data, type, row) {
                     return '<a href="' + data + '">Link</a>';
                 }},
                 { "data": "website" },
+                { "data": "gender" },
                 {% if 'username' in session %}
                 { "data": null, "defaultContent": '<button class="favorite-button">Add to Favorites</button>' }
                 {% endif %}
-            ],
-            "lengthMenu": [[10, 25, 50, 75, 100, 200], [10, 25, 50, 75, 100, 200]], // Add options for number of entries
-            "pageLength": 25 // Default number of entries
+            ]
         });
 
         function refreshTable(data) {
@@ -225,9 +221,9 @@
         $('#genderFilter').change(function() {
             var gender = $(this).val();
             if (gender) {
-                table.column(4).search("^" + gender + "$", true, false, true).draw();
+                table.column(6).search("^" + gender + "$", true, false, true).draw();
             } else {
-                table.column(4).search('').draw();
+                table.column(6).search('').draw();
             }
         });
 

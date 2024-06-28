@@ -106,7 +106,7 @@ def parse(html, url, page):
                 page=page,
                 gender=gender,
                 price_alert_threshold=None,
-                is_in_stock=True
+                is_in_stock="Yes"
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
                 fragrances.append(fragrance)
@@ -169,12 +169,12 @@ async def main():
     try:
         save_to_excel(all_fragrances, base_path, collection_name)
     except Exception as e:
-        logging.info(e)
+        logging.error(f"Error: {e}")
 
     try:
         delete_collection(collection_name)
     except Exception as e:
-        logging.info(e)
+        logging.error(f"Error deleting collection {collection_name}: {e}")
 
     collection = db[collection_name]
 
@@ -183,7 +183,7 @@ async def main():
         db_insert_update_remove(collection, all_fragrances)
     except Exception as e:
         logging.info("Error Occurred on Insert/Update/Remove")
-        logging.info(e)
+        logging.error(f"Error: {e}")
 
     logging.info(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 

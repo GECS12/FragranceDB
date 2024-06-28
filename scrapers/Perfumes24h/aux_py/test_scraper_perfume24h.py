@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from classes.classes import FragranceItem
 from aux_functions.data_functions import standardize_fragrance_names, standardize_brand_names, save_to_excel
 from aux_functions.db_functions import db_insert_update_remove, delete_collection
-from my_flask_app.app import db
+from my_flask_app.app_backup import db
 
 load_dotenv()
 

@@ -12,24 +12,22 @@ from aiohttp import ClientConnectorError, ClientPayloadError, ServerDisconnected
 import chardet
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
 
 from aux_functions.data_functions import standardize_brand_names, standardize_fragrance_names, save_to_excel
 from aux_functions.async_functions import gather_data
-from aux_functions.db_functions import db_insert_update_remove, delete_collection
+from aux_functions.db_functions import db_insert_update_remove, delete_collection, get_existing_ids, get_fragrance_gender_by_id
 from classes.classes import FragranceItem
-from my_flask_app.app import db
+from my_flask_app.app_backup import db
 
 load_dotenv()
 
 # Base URL for PerfumeDigital
 BASE_URL = "https://perfumedigital.es/"
-semaphore_value = 10
-logging.basicConfig(level=logging.INFO)
+semaphore_value = 15
+# retries_value = 5
+# initial_delay_value = 3
 
-# Initialize Motor client
-motor_client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
-motor_db = motor_client[os.getenv("MONGO_DB_NAME")]
+logging.basicConfig(level=logging.INFO)
 
 
 # Function to clean fragrance names specific to PerfumeDigital
@@ -176,7 +174,7 @@ def parse(html, url):
                 price_amount=price_amount,
                 price_currency=price_currency,
                 link=link,
-                website="PerfumeDigital.es",
+                website="perfumeDigital.es",
                 country=["PT", "ES"],
                 last_updated_at=datetime.now(),
                 is_set_or_pack=is_set_or_pack,
@@ -192,20 +190,9 @@ def parse(html, url):
 
 
 # Function to fetch gender information for a fragrance
-async def fetch_gender_perfumedigital(fragrance, semaphore, session, collection, retries=10, delay=3):
+async def fetch_gender_perfumedigital(fragrance, semaphore, session, retries=10, delay=2):
     async with semaphore:
-        await asyncio.sleep(random.uniform(1, 2))  # Small initial delay before fetching
-
-        # Check if the gender information is already stored in the database
-        stored_fragrance = await collection.find_one({"_id": fragrance.get_id()}, {"gender": 1})
-        if stored_fragrance and stored_fragrance.get("gender"):
-            fragrance.gender = stored_fragrance["gender"]
-            logging.info(
-                f"Gender found for {fragrance.get_final_clean_fragrance_name()} at {fragrance.get_link()}")
-            return fragrance
-        else:
-            logging.info(f"Couldn't find gender for {fragrance.get_final_clean_fragrance_name()} at {fragrance.get_link()}")
-
+        await asyncio.sleep(random.uniform(1.5, 2.5))  # Small initial delay before fetching
         for attempt in range(retries):
             try:
                 async with session.get(fragrance.link, timeout=15) as response:
@@ -225,17 +212,12 @@ async def fetch_gender_perfumedigital(fragrance, semaphore, session, collection,
                             fragrance.gender = 'Women'
                         elif 'Hombre' in gender_tag.text:
                             fragrance.gender = 'Men'
-
-                        # Store the gender information in the database
-                        await collection.update_one({"_id": fragrance.get_id()}, {"$set": {"gender": fragrance.gender}},
-                                              upsert=True)
                         return fragrance
 
                     fragrance.gender = None
                     return fragrance
 
-            except (aiohttp.ClientConnectorError, aiohttp.ClientPayloadError, ServerDisconnectedError,
-                    asyncio.TimeoutError) as e:
+            except (ClientConnectorError, ClientPayloadError, ServerDisconnectedError, asyncio.TimeoutError) as e:
                 logging.error(f"Network error ({type(e).__name__}) fetching gender for {fragrance.link}: {e}")
             except ValueError as e:
                 logging.error(f"ValueError fetching gender for {fragrance.link}: {e}")
@@ -249,12 +231,15 @@ async def fetch_gender_perfumedigital(fragrance, semaphore, session, collection,
         fragrance.gender = None
         return fragrance
 
+# Function to fetch existing fragrance details from the database
+
 
 # Main function to orchestrate the scraping process
 async def main():
     start_time = time.time()
 
     collection_name = "PerfumesDigital"
+
     logging.info(f"Started scraping {collection_name}")
 
     async with aiohttp.ClientSession() as session:
@@ -272,8 +257,7 @@ async def main():
                 logging.info("Total pages info not found, defaulting to 1.")
                 total_pages = 1
 
-    selected_pages = total_pages
-    selected_pages = 5
+    selected_pages = 15
     urls = [
         (f"https://perfumedigital.es/index.php?PASE={i * 15}&marca=&buscado=&ID_CATEGORIA=&ORDEN=&precio1=&precio2"
          f"=#PRODUCTOS")
@@ -297,40 +281,47 @@ async def main():
     if failed_pages:
         logging.info(f"Failed to scrape the following pages: {failed_pages}")
 
-    semaphore = asyncio.Semaphore(semaphore_value)
-    collection = motor_db[collection_name]
+    # Retrieve existing _ids from the MongoDB collection
+    collection = db[collection_name]
+    existing_ids = get_existing_ids(collection)
 
+    semaphore = asyncio.Semaphore(semaphore_value)
     async with aiohttp.ClientSession() as session:
-        all_fragrances = await asyncio.gather(
-            *[fetch_gender_perfumedigital(fragrance, semaphore, session, collection) for fragrance in all_fragrances])
+        tasks = []
+        for fragrance in all_fragrances:
+            if fragrance.get_id() not in existing_ids:
+                tasks.append(fetch_gender_perfumedigital(fragrance, semaphore, session))
+            else:
+                # Fetch the gender from the database and set it for the fragrance
+                fragrance.gender = get_fragrance_gender_by_id(collection, fragrance.get_id())
+                tasks.append(asyncio.create_task(asyncio.sleep(0)))  # Skip fetching gender if _id exists
+                logging.info(f"Skipped fetching gender for {fragrance.link}, using existing gender {fragrance.gender}")
+
+        all_fragrances = await asyncio.gather(*tasks)
 
     logging.info(f"Ended scraping {collection_name}")
 
     base_path = os.path.join(os.getcwd(), 'data')  # Update this path as necessary
     os.makedirs(base_path, exist_ok=True)
 
+    # Filter out any None objects from all_fragrances
+    all_fragrances = [f for f in all_fragrances if f is not None]
+
     try:
         save_to_excel(all_fragrances, base_path, collection_name)
     except Exception as e:
         logging.error(f"Error saving to Excel: {e}")
 
-    # try:
-    #     delete_collection(collection_name)
-    # except Exception as e:
-    #     logging.info(e)
-
-    # logging.info(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
-    # collection = db[collection_name]
+    # Uncomment the following lines if you want to insert/update/remove in MongoDB
     # try:
     #     db_insert_update_remove(collection, all_fragrances)
     # except Exception as e:
-    #     logging.info("Error Occurred on Insert/Update/Remove")
-    #     logging.info(e)
-    # logging.info(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
+    #     print("Error Occurred on Insert/Update/Remove")
+    #     print(e)
+    # print(f"End: Inserting/Updating/Removing fragrances from MongoDB for {collection_name}")
 
     end_time = time.time()
     logging.info(f"{collection_name} process took {end_time - start_time:.2f} seconds.")
-
 
 if __name__ == "__main__":
     asyncio.run(main())

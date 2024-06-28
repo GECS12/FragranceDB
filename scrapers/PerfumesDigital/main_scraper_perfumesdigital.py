@@ -17,7 +17,7 @@ from aux_functions.data_functions import standardize_brand_names, standardize_fr
 from aux_functions.async_functions import gather_data
 from aux_functions.db_functions import db_insert_update_remove, delete_collection
 from classes.classes import FragranceItem
-from my_flask_app.app import db
+from my_flask_app.app_backup import db
 
 load_dotenv()
 
@@ -181,7 +181,7 @@ def parse(html, url):
                 page=page,
                 gender=None,
                 price_alert_threshold=None,
-                is_in_stock=True
+                is_in_stock="Yes"
             )
             if fragrance.get_id() not in [f.get_id() for f in fragrances]:  # Ensure no duplicate IDs
                 fragrances.append(fragrance)
@@ -300,7 +300,7 @@ async def main():
     try:
         delete_collection(collection_name)
     except Exception as e:
-        print(e)
+        logging.error(f"Error deleting collection {collection_name}: {e}")
 
     print(f"Start: Inserting/Updating/Removing fragrances in MongoDB for {collection_name}")
     collection = db[collection_name]

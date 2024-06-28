@@ -17,7 +17,7 @@ uri = os.getenv("MONGO_URI")
 
 # Create a new client and connect to the server
 client = MongoClient(uri, server_api=ServerApi('1'), tls=True, tlsCAFile=certifi.where())
-
+db = client["FragrancesDatabase"]
 
 # Function to test the connection
 def test_connection():
@@ -29,11 +29,10 @@ def test_connection():
 
 def insert_collection_from_excel():
     # Load database and collection
-    db = client["FragrancesDatabase"]
     collection = db['PerfumesDigital']
 
     # Path to the Excel file
-    excel_file_path = r'D:\Drive Folder\Fragrances_DB\scrapers\PerfumesDigital\data\PerfumesDigital on 25_Jun_2024 15h37m.xlsx'
+    excel_file_path = r'D:\Drive Folder\Fragrances_DB\scrapers\PerfumesDigital\data\PerfumesDigital on 26_Jun_2024 20h35m.xlsx'
 
     # Read the Excel file
     df = read_excel(excel_file_path)
@@ -46,5 +45,7 @@ def insert_collection_from_excel():
 
 if __name__ == "__main__":
     test_connection()
+    collections = db.list_collection_names()
+    print("Collections:", collections)
     # insert_collection_from_excel()
-    delete_collection("PerfumesDigital")
+    # delete_collection("PerfumesDigital")
